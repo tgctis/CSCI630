@@ -119,12 +119,18 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     size = args.board
+    optimal_knights = int(math.floor((size * size) / 2))
 
-    board = [[0 for x in range(size)] for y in range(size)]
-    c_board = [[0 for x in range(size)] for y in range(size)]
+    for i in range(0, size):
+        c_knights = []
+        board = [[0 for x in range(size)] for y in range(size)]
+        c_board = [[0 for x in range(size)] for y in range(size)]
 
-    for i in range(size*size, 0, -1):
-        if init(1000, i):
+        for i in range(int(optimal_knights * 1.2), 0, -1):
+            if init(100 * size, i):
+                break
+
+        if check_knights() == optimal_knights:
             break
 
     print "Board: "
@@ -135,4 +141,4 @@ if __name__ == '__main__':
 
     print "Conflicted Knights: " + str(len(c_knights))
     print "Placed Knights: " + str(check_knights())
-    print "Optimal Knights: " + str(int(math.floor((size * size) / 2)))
+    print "Optimal Knights: " + str(optimal_knights)
