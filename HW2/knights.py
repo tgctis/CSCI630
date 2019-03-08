@@ -121,7 +121,7 @@ if __name__ == '__main__':
     size = args.board
     optimal_knights = int(math.floor((size * size) / 2))
 
-    for i in range(0, size):
+    for j in range(0, size):
         c_knights = []
         board = [[0 for x in range(size)] for y in range(size)]
         c_board = [[0 for x in range(size)] for y in range(size)]
@@ -129,6 +129,8 @@ if __name__ == '__main__':
         for i in range(int(optimal_knights * 1.2), 0, -1):
             if init(100 * size, i):
                 break
+
+        print ("Attempt #%3d: %3d placed out of optimal %3d" % (j, check_knights(), optimal_knights))
 
         if check_knights() == optimal_knights:
             break
