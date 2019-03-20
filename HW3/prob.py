@@ -39,7 +39,7 @@ for i in range(0, len(rewards)):
     # print "Probability of %-30s is %0.5f with a reward of %2d => Effective reward = %2.5f" \
     #       % (reel, prob, reward, reward * prob)
 
-# print "Probability of a winning spin = %0.5f, effective reward per spin = %2.5f" % (p_win, p_win * e_reward)
+print "Probability of a winning spin = %0.5f, effective reward per spin = %2.5f" % (p_win, p_win * e_reward)
 
 
 def pull():
@@ -88,7 +88,7 @@ def fselect(xs=[], i=0):
     return i
 
 
-simulations = 100
+simulations = 10
 total_pulls = 0
 fat_cat = 0
 all_pulls = []
