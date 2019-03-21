@@ -15,7 +15,10 @@ wallet_size = 10
 slots = 3
 probability = 0.25
 
-
+# Calculates probability of a specific spin.
+# The probability of getting any symbol is 0.25
+# The probability of getting any symbol is 1, so this will just multiply 0.25 x number of specific slots
+# the probability of [cherry][cherry] is 0.25 * 0.25 or 0.625 since it's (1/4)(1/4)(1/1).
 def calc_prob(a, p, s):
     P = 1
     for i in range(0, s):
@@ -25,6 +28,7 @@ def calc_prob(a, p, s):
     return P
 
 
+# This is just a one-off run to get some data.
 p_win = 0
 e_reward = 0
 for i in range(0, len(rewards)):
@@ -36,19 +40,20 @@ for i in range(0, len(rewards)):
     prob = calc_prob(rewards[i][0], probability, slots)
     p_win = p_win + prob
     e_reward = e_reward + (reward * prob)
-    # print "Probability of %-30s is %0.5f with a reward of %2d => Effective reward = %2.5f" \
-    #       % (reel, prob, reward, reward * prob)
+    print "Probability of %-30s is %0.5f with a reward of %2d => Effective reward = %2.5f" \
+          % (reel, prob, reward, reward * prob)
 
 print "Probability of a winning spin = %0.5f, effective reward per spin = %2.5f" % (p_win, p_win * e_reward)
 
-
+# Simulates a 'pull' by returning 3 randomly selected slots.
 def pull():
     the_pull = []
     for i in range(slots):
         the_pull.append(symbols[random.randint(0, 3)])
     return the_pull
 
-
+# Gets the reward of a specific pull based on the rewards defined at the top.
+# This could've been done a little better with something like a hash table and hash the reel results.
 def reward(pull):
     pull_s = ''
     for reel in pull:
@@ -63,7 +68,7 @@ def reward(pull):
             return rewards[i][1]
     return -1
 
-
+# Select algorithm to get the median.
 def fselect(xs=[], i=0):
     if len(xs) < 1:
         return False
