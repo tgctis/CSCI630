@@ -3,13 +3,13 @@ import random
 texas = 1
 florida = 0
 
-alpha = 0.9
+alpha = 0.7
 
 xs = [[11, 70], [35, 11], [21, 45], [60, 80], [37, 32], [26, 64], [44, 30], [12, 60]]
 ys = [1, 0, 1, 0, 0, 1, 0, 1]
 l = len(xs)
 # ws = [random.random(), random.random()]
-ws = [0.1, 0.2]
+ws = [0.1, 0.9]
 
 
 # step activation function
@@ -22,10 +22,10 @@ def g(_sum):
 
 # each learning iteration
 for step in range(10):
-    for i in range(0, l-1):
+    for i in range(0, l):
         _sum = 0
         # Summation over all the x values & weights
-        for j in range(0, len(xs[i])-1):
+        for j in range(0, len(xs[i])):
             _sum += ws[j] * xs[i][j]
 
         # calculated y
@@ -40,7 +40,7 @@ for step in range(10):
             error = 0
 
         # back propagate here
-        for j in range(0, len(xs[i]) - 1):
+        for j in range(0, len(xs[i])):
             ws[j] += ws[j] * alpha * error
 
 
@@ -51,12 +51,18 @@ for step in range(10):
 
 
 def check():
-    for _i in range(l-1):
+    total = l
+    right = 0
+    for _i in range(l):
         test_x1 = xs[_i][0]
         test_x2 = xs[_i][1]
-
-        print("Consider the following data [" + str(test_x1) + ", " + str(test_x2) + "] = " + str(ys[_i])
-              + " Computed: " + str(g(test_x1 * ws[0] + test_x2 * ws[1])))
+        actual = ys[_i]
+        computed = g(test_x1 * ws[0] + test_x2 * ws[1])
+        if computed == actual:
+            right += 1
+        print("Consider the following data [" + str(test_x1) + ", " + str(test_x2) + "] = " + str(actual)
+              + " Computed: " + str(computed))
+    print "Total accuracy: %.2f%%" % ((right * 1.0/total * 1.0) * 100)
 
 
 check()
