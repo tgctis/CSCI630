@@ -68,15 +68,17 @@ def check(output=False):
     return right
 
 
-_steps = 1
-MAX_STEPS = 10000
+# Attempts and improving accuracy, couldn't improve.
+# _steps = 1
+# MAX_STEPS = 10000
+# g8r(_steps)
+# check()
+#
+# while check() < l and _steps < MAX_STEPS:
+#     _steps += 1
+#     g8r(_steps)
+
+_steps = 15
 g8r(_steps)
-check()
-
-while check() < l and _steps < MAX_STEPS:
-    _steps += 1
-    g8r(_steps)
-
-
 check(True)
 print "Final weights: ", ws, "Num steps: ", _steps
