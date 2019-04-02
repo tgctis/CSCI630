@@ -3,13 +3,17 @@ import random
 texas = 1
 florida = 0
 
-alpha = 0.7
+# Learning rate
+alpha = 0.6
 
+# Data
 xs = [[11, 70], [35, 11], [21, 45], [60, 80], [37, 32], [26, 64], [44, 30], [12, 60]]
 ys = [1, 0, 1, 0, 0, 1, 0, 1]
 l = len(xs)
-# ws = [random.random(), random.random()]
+
+# Weights
 ws = [0.1, 0.9]
+# ws = [random.random(), random.random()]
 
 
 # step activation function
@@ -44,12 +48,7 @@ for step in range(10):
             ws[j] += ws[j] * alpha * error
 
 
-# test_x1 = 35
-# test_x2 = 11
-# print("Consider the following data [" + str(test_x1) + ", " + str(test_x2) + "] = "
-#       + str(g(test_x1 * ws[0] + test_x2 * ws[1])))
-
-
+# Does the final check of the data to see how the weights worked.
 def check():
     total = l
     right = 0
@@ -66,3 +65,4 @@ def check():
 
 
 check()
+print "Final weights: ", ws
