@@ -1,0 +1,19 @@
+"""
+Old code:
+
+
+def print_word_bags(subreddits):
+	for subreddit in subreddits:
+		df = load_df(subreddit)
+		bag_of_words = word_sack(df)
+		print bag_of_words
+
+
+def load_df(_subreddit):
+	return pd.read_csv(_subreddit + ".csv")
+
+
+def word_sack(_df):
+	return _df.apply(lambda x: x.str.split(expand=True).stack()).stack().value_counts()
+
+"""

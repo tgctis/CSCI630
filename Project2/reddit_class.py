@@ -2,48 +2,115 @@ import sys
 import os
 import time
 import pandas as pd
-import hashlib
+import numpy as np
+# import hashlib
 sys.path.append(os.path.abspath("C:\\tmp"))
 from reddit_id import *
+# import nltk
+# nltk.download()
 
-reddit = get_reddit()
+from nltk.stem.snowball import SnowballStemmer
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.linear_model import SGDClassifier
+from sklearn.pipeline import Pipeline
 
 
-def load_df(_subreddit):
-	return pd.read_csv(_subreddit + ".csv")
+reddit = get_reddit()  # gets my personal reddit info, praw
+_subreddits = ['legaladvice', 'politics']  # subreddits to test
+stemmer = SnowballStemmer("english", ignore_stopwords=True)  # stemming, tricky business
 
 
-def word_sack(_df):
-	return _df.apply(lambda x: x.str.split(expand=True).stack()).stack().value_counts()
-
-def cleave(_subreddit, MAX_POSTS):
-	timestamp = time.time()
+def sew(_subreddit, MAX_POSTS):
 	postlist = []
 
-	submission_num = 0
+	submission_num = 0  # counts the submission
 	for submission in reddit.subreddit(_subreddit).stream.submissions():
-		submission_num = submission_num + 1
+		submission_num += 1
 		if submission_num > MAX_POSTS:
 			break
 		print "Submission #", submission_num
 		submission.comments.replace_more(limit=None)
 		for comment in submission.comments.list():
-			hash_object = hashlib.md5(comment.permalink)
-			id = hash_object.hexdigest()
-			post = [id, comment.body, _subreddit]
+			post = [comment.body, _subreddit]
 			postlist.append(post)
 
 	print "Posts: ", len(postlist)
-	df = pd.DataFrame(postlist, columns=['ID', 'BODY', 'SUBREDDIT'])
-	df.to_csv(_subreddit + '.csv', index=False, mode='w', encoding="utf-8")
+	return postlist
 
 
-def workit(posts, subreddits):
+def reap(postlist, name='temp'):
+	df = pd.DataFrame(postlist, columns=['BODY', 'SUBREDDIT'])
+	df.to_csv(name + '.csv', index=False, mode='w', encoding="utf-8")
+
+
+def test_nb(csv_name='temp.csv'):
+	data = pd.read_csv(csv_name)  # inhales data from the CSV into the panda data frame
+	numpy_array = data.values  # converts to numpy array
+
+	X = numpy_array[:, 0]
+	Y = numpy_array[:, 1]
+
+	X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.4, random_state=42)
+	text_clf = Pipeline([
+		('vect', CountVectorizer(stop_words='english')),
+		('tfidf', TfidfTransformer()),
+		('clf', MultinomialNB()),
+	])
+
+	text_clf = text_clf.fit(X_train, Y_train)
+	predicted = text_clf.predict(X_test)
+	return np.mean(predicted == Y_test)
+
+
+def test_svm(stemmed=0, csv_name='temp.csv'):
+	# text in column 1, classifier in column 2.
+	data = pd.read_csv(csv_name)
+	numpy_array = data.values
+
+	X = numpy_array[:,0]
+	Y = numpy_array[:,1]
+
+	X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.4, random_state=42)
+
+	class StemmedCountVectorizer(CountVectorizer):
+		def build_analyzer(self):
+			analyzer = super(StemmedCountVectorizer, self).build_analyzer()
+			return lambda doc: ([stemmer.stem(w) for w in analyzer(doc)])
+
+	if stemmed:
+		stemmed_count_vect = StemmedCountVectorizer(stop_words='english')
+	else:
+		stemmed_count_vect = CountVectorizer(stop_words='english')
+
+	text_clf_svm = Pipeline([
+		('vect', stemmed_count_vect),
+		('tfidf', TfidfTransformer()),
+		('clf-svm', SGDClassifier(
+			loss='hinge', penalty='l2'
+			, alpha=1e-3
+			, max_iter=20
+			, tol=1e-3
+			, random_state=42))
+	])
+
+	text_clf_svm = text_clf_svm.fit(X_train, Y_train)
+	predicted = text_clf_svm.predict(X_test)
+	return np.mean(predicted == Y_test)
+
+
+def save_reddit(posts, subreddits):
+	postlist = []
 	for subreddit in subreddits:
-		# cleave(subreddit, posts)
-		df = load_df(subreddit)
-		bag_of_words = word_sack(df)
-		print bag_of_words
+		print "Downloading submissions for ", subreddit
+		postlist = postlist + sew(subreddit, posts)
+		print "Concatenated postlist now contains ", len(postlist), " posts"
+	reap(postlist)
 
 
-workit(100, ['legaladvice', 'politics'])
+# save_reddit(100, _subreddits)
+print "Accuracy of Naive Bayes: %0.5f" % (test_nb())
+print "Accuracy of SVM - stemming: %0.5f" % (test_svm())
+print "Accuracy of SVM - no stemming: %0.5f" % (test_svm(1))
