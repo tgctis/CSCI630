@@ -31,16 +31,18 @@ stemmer = SnowballStemmer("english", ignore_stopwords=True)  # stemming, tricky 
 def sew(_subreddit, MAX_POSTS):
 	postlist = []
 
-	submission_num = 0  # counts the submission
+	post_num = 0  # counts the submission
 	for submission in reddit.subreddit(_subreddit).stream.submissions():
-		submission_num += 1
-		if submission_num > MAX_POSTS:
-			break
-		print "Submission #", submission_num
 		submission.comments.replace_more(limit=None)
 		for comment in submission.comments.list():
+			if post_num > MAX_POSTS:
+				break
+			print "Post #", post_num
 			post = [comment.body, _subreddit]
 			postlist.append(post)
+			post_num += 1
+		if post_num > MAX_POSTS:
+			break
 
 	print "Posts: ", len(postlist)
 	return postlist
@@ -173,6 +175,7 @@ def test_svm(stemmed=0, plot=0, csv_name='temp.csv'):
 
 	X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.4, random_state=42)
 
+	#  Default ignore stop words
 	class StemmedCountVectorizer(CountVectorizer):
 		def build_analyzer(self):
 			analyzer = super(StemmedCountVectorizer, self).build_analyzer()
@@ -189,7 +192,7 @@ def test_svm(stemmed=0, plot=0, csv_name='temp.csv'):
 		('clf-svm', SGDClassifier(
 			loss='hinge', penalty='l2'
 			, alpha=1e-3
-			, max_iter=30
+			, max_iter=40
 			, tol=1e-3
 			, random_state=42))
 	])
@@ -216,6 +219,7 @@ def test_forest(stemmed=0, plot=0, csv_name='temp.csv'):
 	Y = numpy_array[:, 1]
 	X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.4, random_state=42)
 
+	#  Default removes stop words
 	class StemmedCountVectorizer(CountVectorizer):
 		def build_analyzer(self):
 			analyzer = super(StemmedCountVectorizer, self).build_analyzer()
@@ -232,9 +236,9 @@ def test_forest(stemmed=0, plot=0, csv_name='temp.csv'):
 		('vect', stemmed_count_vect),
 		('tfidf', TfidfTransformer()),
 		# ('clf-rf', RandomForestClassifier(n_estimators=100, max_depth=2, random_state=0))
-		('clf-rf', RandomForestClassifier(bootstrap=True, class_weight=None, criterion='entropy',
-			max_depth=None, max_features='auto', max_leaf_nodes=3,
-			min_impurity_decrease=0.0, min_impurity_split=None,
+		('clf-rf', RandomForestClassifier(bootstrap=True, class_weight=None, criterion='gini',
+			max_depth=None, max_features=None, max_leaf_nodes=10,
+			min_impurity_decrease=0, min_impurity_split=None,
 			min_samples_leaf=1, min_samples_split=2,
 			min_weight_fraction_leaf=0, n_estimators=2, n_jobs=None,
 			oob_score=False, random_state=0, verbose=0, warm_start=True))
@@ -262,15 +266,24 @@ def save_reddit(posts, subreddits, name='temp'):
 		print "Concatenated postlist now contains ", len(postlist), " posts"
 	reap(postlist, name)
 
-
-save_reddit(100, ['sports', 'waterniggas', 'politics'], '3x_subreddits')
-# print "Accuracy of Naive Bayes: %0.5f" % (test_nb())
+""" TO THE nth DEGREE!"""
+""" THE BEATINGS WILL CONTINUE UNTIL CLASSIFICATION IMPROVES """
+doc_name = '2x_crappy_subreddits'
+# save_reddit(100, ['dankmemes', 'shaqholdingthings'], doc_name)
+# print "Accuracy of Naive Bayes: %0.5f" % (test_nb(doc_name+'.csv'))
 # print "Accuracy of SVM - no stop: %0.5f" % (test_svm(-1))
 # print "Accuracy of SVM - no stemming, full stop: %0.5f" % (test_svm(0))
-print "Accuracy of SVM - stemming: %0.5f" % (test_svm(1, 1, '3x_subreddits.csv'))
-# print "Accuracy of Random Forest, no stop: %0.5f" % (test_forest(-1))
-# print "Accuracy of Random Forest, no stemming, full stop: %0.5f" % (test_forest(0))
-print "Accuracy of Random Forest - stemming: %0.5f" % (test_forest(1, 1, '3x_subreddits.csv'))
+# print "Accuracy of SVM - stemming: %0.5f" % (test_svm(1, 1, doc_name+'.csv'))
+print "Accuracy of Random Forest, no stop: %0.5f" % (test_forest(-1, 1, doc_name+'.csv'))
+print "Accuracy of Random Forest, no stemming, full stop: %0.5f" % (test_forest(0, 1, doc_name+'.csv'))
+print "Accuracy of Random Forest, stemming: %0.5f" % (test_forest(1, 1, doc_name+'.csv'))
+# for i in range(1, 2):
+# 	trees = i/10.0
+# 	print "Using ", trees, " trees"
+# 	print "Accuracy of Random Forest, no stop: %0.5f" % (test_forest(-1, 1, doc_name + '.csv', trees))
+# 	print "Accuracy of Random Forest, no stemming, full stop: %0.5f" % (test_forest(0, 1, doc_name + '.csv', trees))
+# 	print "Accuracy of Random Forest, stemming: %0.5f" % (test_forest(1, 1, doc_name + '.csv', trees))
+
 plt.show()
 """
 digits = load_digits()
