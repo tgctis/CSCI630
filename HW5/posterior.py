@@ -4,6 +4,13 @@ import matplotlib.pyplot as plt
 
 # Generates the dataset using randint, writes to a file to be later read from; or to memory if temporary=1.
 def gen_dataset(temporary, name='tmp', size=100):
+    """
+    Generates a data set
+    :param temporary: 1 if themporary data set, no saving
+    :param name: Name of the file if being saved.
+    :param size: how much data you want
+    :return: returns name of file if saved, dataset if temporary
+    """
     dataset = []
     data_string = ''
     for i in range(0, size):
@@ -29,12 +36,24 @@ def gen_dataset(temporary, name='tmp', size=100):
 
 # Takes a file separated by '-' and returns the array of 1's & 0's
 def load_dataset(name='tmp'):
+    """
+    Loads the data set from a filename
+    :param name: name of file
+    :return: returns the data set
+    """
     file = open(name, 'r')
     return file.read().split('-')
 
 
 # calculates the numerator of Bayes theorem
 def calc_prob(prob, lime, prob_lime):
+    """
+    This will produce the numerator of Bayes theorem.
+    :param prob: previous probability
+    :param lime: 1 if lime, 0 if lemon
+    :param prob_lime: probability of lime
+    :return: returns the numerator of Bayes
+    """
     prob_lemon = 1 - prob_lime
     # This is one place where the distinction of 1 == lime is made.
     if lime == 1:
@@ -44,6 +63,11 @@ def calc_prob(prob, lime, prob_lime):
 
 
 def plot_dataset(dataset):
+    """
+    This will take a data set in and produce a posterior probability chart
+    :param dataset: the data set of limes/lemons
+    :return: outputs a pyplot.
+    """
     h1 = [0.1]
     h2 = [0.2]
     h3 = [0.4]
@@ -65,7 +89,7 @@ def plot_dataset(dataset):
             norm += h3[n] * 0.5
             norm += h4[n] * 0.25
             norm += h5[n] * 0
-
+        # `norm` is the normalization for Bayes
         prob_h1 = calc_prob(h1[n], lime, 0)
         h1.append(prob_h1/norm)
 
@@ -101,6 +125,7 @@ def plot_dataset(dataset):
     plt.show()
 
 
+# Running the show.
 dataset = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]  # looks like in the book
 plot_dataset(dataset)
 dataset = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # Unexpected
