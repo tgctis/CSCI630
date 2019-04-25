@@ -1,5 +1,6 @@
 import sys
 import os
+import json
 import time
 import pandas as pd
 import numpy as np
@@ -29,9 +30,15 @@ stemmer = SnowballStemmer("english", ignore_stopwords=True)  # stemming, tricky 
 
 
 def sew(_subreddit, MAX_POSTS):
+	"""
+	This will gather posts from reddit.
+	:param _subreddit: The subreddit to harvest
+	:param MAX_POSTS: The amount of posts to get
+	:return: simple list of posts.
+	"""
 	postlist = []
 
-	post_num = 0  # counts the submission
+	post_num = 1  # counts the submission
 	for submission in reddit.subreddit(_subreddit).stream.submissions():
 		submission.comments.replace_more(limit=None)
 		for comment in submission.comments.list():
@@ -48,11 +55,46 @@ def sew(_subreddit, MAX_POSTS):
 	return postlist
 
 
+def get_data(subreddit_names, max_posts):
+	sub_count = 0
+	comments_dict = {'comments': [], "subreddit name": []}
+
+	for name in subreddit_names:
+		for comment in reddit.subreddit(name).stream.comments():
+			data = vars(comment)
+			comments_dict['comments'].append(data['body'])
+			comments_dict['subreddit name'].append(data['subreddit_name_prefixed'])
+
+			sub_count += 1
+			if sub_count > max_posts:
+				sub_count = 0
+				break
+
+	return comments_dict
+
+
 def reap(postlist, name='temp'):
+	"""
+	This will convert the postlist to a dataframe.
+	:param postlist: the simple list returned from sew()
+	:param name: The name of the file to save the list to
+	:return:
+	"""
 	df = pd.DataFrame(postlist, columns=['BODY', 'SUBREDDIT'])
-	df.to_csv(name + '.csv', index=False, mode='w', encoding="utf-8")
+	df.to_json(name + '.json', orient='index', force_ascii=False)
 
 
+def export_data(data, file_name):
+	with open(file_name, "w") as export_file:
+		json.dump(data, export_file, indent=2)
+
+
+def read_data(file_name):
+	df = pd.read_json(file_name, orient='columns')
+	return df
+
+
+# From : https://scikit-learn.org/stable/auto_examples/model_selection/plot_learning_curve.html
 def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
 	n_jobs=None, train_sizes=np.linspace(.1, 1.0, 5)):
 	"""
@@ -136,8 +178,12 @@ def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
 	return plt
 
 
-def test_nb(csv_name='temp.csv'):
-	data = pd.read_csv(csv_name)  # inhales data from the CSV into the panda data frame
+def test_nb(data):
+	"""
+	Demo test, but interesting none-the-less
+	:param data pandas dataframe
+	:return: returns the average correctness
+	"""
 	numpy_array = data.values  # converts to numpy array
 
 	X = numpy_array[:, 0]
@@ -165,9 +211,18 @@ def test_nb(csv_name='temp.csv'):
 	return np.mean(predicted == Y_test)
 
 
-def test_svm(stemmed=0, plot=0, csv_name='temp.csv'):
+def test_svm(data, stemmed=0, plot=0, title="Learning Curves - Doc Classification (SVM)"):
+	"""
+	Trains and demonstrates an SVM classifier
+	:param data: pandas dataframe
+	:param stemmed: whether it should use nltk stemming
+		1 = using nltk stemming
+		0 = using standard stemming
+		-1 = using standard stemming, no stop words
+	:param plot:
+	:return:
+	"""
 	# text in column 1, classifier in column 2.
-	data = pd.read_csv(csv_name)
 	numpy_array = data.values
 
 	X = numpy_array[:,0]
@@ -181,10 +236,14 @@ def test_svm(stemmed=0, plot=0, csv_name='temp.csv'):
 			analyzer = super(StemmedCountVectorizer, self).build_analyzer()
 			return lambda doc: ([stemmer.stem(w) for w in analyzer(doc)])
 
-	if stemmed:
+	if stemmed == 0:
 		stemmed_count_vect = StemmedCountVectorizer(stop_words='english')
-	else:
+	elif stemmed == 2:
+		stemmed_count_vect = StemmedCountVectorizer()
+	elif stemmed == 1:
 		stemmed_count_vect = CountVectorizer(stop_words='english')
+	else:
+		stemmed_count_vect = CountVectorizer()
 
 	text_clf_svm = Pipeline([
 		('vect', stemmed_count_vect),
@@ -201,7 +260,7 @@ def test_svm(stemmed=0, plot=0, csv_name='temp.csv'):
 	predicted = text_clf_svm.predict(X_test)
 	# plotting
 	if plot == 1:
-		title = "Learning Curves - Doc Classification (SVM)"
+
 		# Cross validation with 100 iterations to get smoother mean test and train
 		# score curves, each time with 20% data randomly selected as a validation set.
 		cv = ShuffleSplit(n_splits=100, test_size=0.2, random_state=0)
@@ -211,8 +270,17 @@ def test_svm(stemmed=0, plot=0, csv_name='temp.csv'):
 	return np.mean(predicted == Y_test)
 
 
-def test_forest(stemmed=0, plot=0, csv_name='temp.csv'):
-	data = pd.read_csv(csv_name)
+def test_forest(data, stemmed=0, plot=0, title="Learning Curves - Doc Classification (Random Forest)"):
+	"""
+	Trains and evaluates a random forest
+	:param data: pandas dataframe
+	:param stemmed: Whether to use stemming or stops
+		0 = Uses nltk stemming with stop words
+		1 = uses standard stemming with stop words
+		-1 = uses standard stemming, no stop words
+	:param plot:
+	:return:
+	"""
 	numpy_array = data.values
 
 	X = numpy_array[:, 0]
@@ -227,6 +295,8 @@ def test_forest(stemmed=0, plot=0, csv_name='temp.csv'):
 
 	if stemmed == 0:
 		stemmed_count_vect = StemmedCountVectorizer(stop_words='english')
+	elif stemmed == 2:
+		stemmed_count_vect = StemmedCountVectorizer()
 	elif stemmed == 1:
 		stemmed_count_vect = CountVectorizer(stop_words='english')
 	else:
@@ -248,7 +318,7 @@ def test_forest(stemmed=0, plot=0, csv_name='temp.csv'):
 	predicted = text_clf_rf.predict(X_test)
 	# plotting
 	if plot == 1:
-		title = "Learning Curves - Doc Classification (Random Forest)"
+
 		# Cross validation with 100 iterations to get smoother mean test and train
 		# score curves, each time with 20% data randomly selected as a validation set.
 		cv = ShuffleSplit(n_splits=100, test_size=0.2, random_state=0)
@@ -265,45 +335,26 @@ def save_reddit(posts, subreddits, name='temp'):
 		postlist = postlist + sew(subreddit, posts)
 		print "Concatenated postlist now contains ", len(postlist), " posts"
 	reap(postlist, name)
+	return 0
 
-""" TO THE nth DEGREE!"""
+
+def export_reddit(posts, subreddits, name='temp'):
+	data = get_data(subreddits, posts)
+	export_data(data, name)
+
+
 """ THE BEATINGS WILL CONTINUE UNTIL CLASSIFICATION IMPROVES """
-doc_name = '2x_crappy_subreddits'
-# save_reddit(100, ['dankmemes', 'shaqholdingthings'], doc_name)
-# print "Accuracy of Naive Bayes: %0.5f" % (test_nb(doc_name+'.csv'))
-# print "Accuracy of SVM - no stop: %0.5f" % (test_svm(-1))
-# print "Accuracy of SVM - no stemming, full stop: %0.5f" % (test_svm(0))
-# print "Accuracy of SVM - stemming: %0.5f" % (test_svm(1, 1, doc_name+'.csv'))
-print "Accuracy of Random Forest, no stop: %0.5f" % (test_forest(-1, 1, doc_name+'.csv'))
-print "Accuracy of Random Forest, no stemming, full stop: %0.5f" % (test_forest(0, 1, doc_name+'.csv'))
-print "Accuracy of Random Forest, stemming: %0.5f" % (test_forest(1, 1, doc_name+'.csv'))
-# for i in range(1, 2):
-# 	trees = i/10.0
-# 	print "Using ", trees, " trees"
-# 	print "Accuracy of Random Forest, no stop: %0.5f" % (test_forest(-1, 1, doc_name + '.csv', trees))
-# 	print "Accuracy of Random Forest, no stemming, full stop: %0.5f" % (test_forest(0, 1, doc_name + '.csv', trees))
-# 	print "Accuracy of Random Forest, stemming: %0.5f" % (test_forest(1, 1, doc_name + '.csv', trees))
+doc_name = '2x_json_test.json'
+# export_reddit(200, ['sports', 'politics'], doc_name)
+data = read_data(doc_name)
+
+print "Accuracy of SVM - Stemming w/ stop: %0.5f" % (test_svm(data, 1, 1, "Learning Curve SVM, Stemming, Stop Words"))
+print "Accuracy of SVM - Stemming w/o stop: %0.5f" % (test_svm(data, -1, 1, "Learning Curve SVM, Stemming, No Stop Words"))
+print "Accuracy of SVM - nltk Stemming w/stop: %0.5f" % (test_svm(data, 0, 1, "Learning Curve SVM, NLTK Stemming, Stop Words"))
+print "Accuracy of SVM - nltk Stemming w/o stop: %0.5f" % (test_svm(data, 2, 1, "Learning Curve SVM, NLTK Stemming, No Stop Words"))
+print "Accuracy of Random Forest, Stemming w/ stop: %0.5f" % (test_forest(data, 1, 1, "Learning Curve Random Forest, Stemming, Stop Words"))
+print "Accuracy of Random Forest, Stemming w/o stop: %0.5f" % (test_forest(data, -1, 1, "Learning Curve Random Forest, Stemming, No Stop Words"))
+print "Accuracy of Random Forest, nltk Stemming w/stop: %0.5f" % (test_forest(data, 0, 1, "Learning Curve Random Forest, NLTK Stemming, Stop Words"))
+print "Accuracy of Random Forest, nltk Stemming w/o stop: %0.5f" % (test_forest(data, 2, 1, "Learning Curve Random Forest, NLTK Stemming, No Stop Words"))
 
 plt.show()
-"""
-digits = load_digits()
-X, y = digits.data, digits.target
-
-
-title = "Learning Curves (Naive Bayes)"
-# Cross validation with 100 iterations to get smoother mean test and train
-# score curves, each time with 20% data randomly selected as a validation set.
-cv = ShuffleSplit(n_splits=100, test_size=0.2, random_state=0)
-
-estimator = GaussianNB()
-plot_learning_curve(estimator, title, X, y, ylim=(0.7, 1.01), cv=cv, n_jobs=4)
-
-title = r"Learning Curves (SVM, RBF kernel, $\gamma=0.001$)"
-# SVC is more expensive so we do a lower number of CV iterations:
-cv = ShuffleSplit(n_splits=10, test_size=0.2, random_state=0)
-estimator = SVC(gamma=0.001)
-plot_learning_curve(estimator, title, X, y, (0.7, 1.01), cv=cv, n_jobs=4)
-
-plt.show()
-
-"""
