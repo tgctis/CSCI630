@@ -56,19 +56,32 @@ def sew(_subreddit, MAX_POSTS):
 
 
 def get_data(subreddit_names, max_posts):
-	sub_count = 0
+	sub_count = 1
 	comments_dict = {'comments': [], "subreddit name": []}
 
 	for name in subreddit_names:
-		for comment in reddit.subreddit(name).stream.comments():
-			data = vars(comment)
-			comments_dict['comments'].append(data['body'])
-			comments_dict['subreddit name'].append(data['subreddit_name_prefixed'])
-
-			sub_count += 1
-			if sub_count > max_posts:
-				sub_count = 0
-				break
+		for submission in reddit.subreddit(name).stream.submissions():
+			if submission.is_self and len(submission.selftext) > 1:
+				comments_dict['comments'].append(submission.selftext)
+				comments_dict['subreddit name'].append(name)
+				print name, sub_count
+				sub_count += 1
+				if sub_count > max_posts:
+					sub_count = 1
+					break
+			# submission.comments.replace_more(limit=0)
+			# for comment in submission.comments.list():
+		# for comment in reddit.subreddit(name).stream.comments():
+		# 		data = vars(comment)
+		# 		comments_dict['comments'].append(data['body'])
+		# 		comments_dict['subreddit name'].append(data['subreddit_name_prefixed'])
+		# 		print name, sub_count
+		# 		sub_count += 1
+		# 		if sub_count > max_posts:
+		# 			break
+		# 	if sub_count > max_posts:
+		# 		sub_count = 0
+		# 		break
 
 	return comments_dict
 
@@ -178,10 +191,13 @@ def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
 	return plt
 
 
-def test_nb(data):
+def test_nb(data, stemmed, plot, title):
 	"""
 	Demo test, but interesting none-the-less
 	:param data pandas dataframe
+	:param stemmed stemming
+	:param plot 1/0, yes/no plot
+	:param title title of plot
 	:return: returns the average correctness
 	"""
 	numpy_array = data.values  # converts to numpy array
@@ -189,9 +205,23 @@ def test_nb(data):
 	X = numpy_array[:, 0]
 	Y = numpy_array[:, 1]
 
+	class StemmedCountVectorizer(CountVectorizer):
+		def build_analyzer(self):
+			analyzer = super(StemmedCountVectorizer, self).build_analyzer()
+			return lambda doc: ([stemmer.stem(w) for w in analyzer(doc)])
+
+	if stemmed == 0:
+		stemmed_count_vect = StemmedCountVectorizer(stop_words='english')
+	elif stemmed == 2:
+		stemmed_count_vect = StemmedCountVectorizer()
+	elif stemmed == 1:
+		stemmed_count_vect = CountVectorizer(stop_words='english')
+	else:
+		stemmed_count_vect = CountVectorizer()
+
 	X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.4, random_state=42)
 	text_clf = Pipeline([
-		('vect', CountVectorizer(stop_words='english')),
+		('vect', stemmed_count_vect),
 		('tfidf', TfidfTransformer()),
 		('clf', MultinomialNB()),
 	])
@@ -200,12 +230,13 @@ def test_nb(data):
 	predicted = text_clf.predict(X_test)
 
 	# plotting
-	title = "Learning Curves (Naive Bayes) - Doc"
-	# Cross validation with 100 iterations to get smoother mean test and train
-	# score curves, each time with 20% data randomly selected as a validation set.
-	cv = ShuffleSplit(n_splits=100, test_size=0.2, random_state=0)
-	estimator = text_clf
-	plot_learning_curve(estimator, title, X, Y, cv=cv, n_jobs=4)
+	if plot == 1:
+		# Cross validation with 100 iterations to get smoother mean test and train
+		# score curves, each time with 20% data randomly selected as a validation set.
+		cv = ShuffleSplit(n_splits=100, test_size=0.2, random_state=0)
+		estimator = text_clf
+		plot_learning_curve(estimator, title, X, Y, cv=cv, n_jobs=4)
+		plt.savefig("plots/"+title)
 	# end plotting
 
 	return np.mean(predicted == Y_test)
@@ -266,6 +297,7 @@ def test_svm(data, stemmed=0, plot=0, title="Learning Curves - Doc Classificatio
 		cv = ShuffleSplit(n_splits=100, test_size=0.2, random_state=0)
 		estimator = text_clf_svm
 		plot_learning_curve(estimator, title, X, Y, cv=cv, n_jobs=4)
+		plt.savefig("plots/"+title)
 	# end plotting
 	return np.mean(predicted == Y_test)
 
@@ -324,6 +356,7 @@ def test_forest(data, stemmed=0, plot=0, title="Learning Curves - Doc Classifica
 		cv = ShuffleSplit(n_splits=100, test_size=0.2, random_state=0)
 		estimator = text_clf_rf
 		plot_learning_curve(estimator, title, X, Y, cv=cv, n_jobs=4)
+		plt.savefig("plots/"+title)
 	# end plotting
 	return np.mean(predicted == Y_test)
 
@@ -344,17 +377,73 @@ def export_reddit(posts, subreddits, name='temp'):
 
 
 """ THE BEATINGS WILL CONTINUE UNTIL CLASSIFICATION IMPROVES """
-doc_name = '2x_json_test.json'
-# export_reddit(200, ['sports', 'politics'], doc_name)
-data = read_data(doc_name)
+doc_name = '2x_submissions_only.json'
+export_reddit(200, ['legaladvice', 'personalfinance'], doc_name)
+#
+# doc_name = '2x_monster.json'
+# export_reddit(500, ['sports', 'personalfinance'], doc_name)
+#
+# doc_name = '3x_subreddit_test.json'
+# export_reddit(200, ['askreddit', 'personalfinance', 'nosleep'], doc_name)
 
-print "Accuracy of SVM - Stemming w/ stop: %0.5f" % (test_svm(data, 1, 1, "Learning Curve SVM, Stemming, Stop Words"))
-print "Accuracy of SVM - Stemming w/o stop: %0.5f" % (test_svm(data, -1, 1, "Learning Curve SVM, Stemming, No Stop Words"))
-print "Accuracy of SVM - nltk Stemming w/stop: %0.5f" % (test_svm(data, 0, 1, "Learning Curve SVM, NLTK Stemming, Stop Words"))
-print "Accuracy of SVM - nltk Stemming w/o stop: %0.5f" % (test_svm(data, 2, 1, "Learning Curve SVM, NLTK Stemming, No Stop Words"))
-print "Accuracy of Random Forest, Stemming w/ stop: %0.5f" % (test_forest(data, 1, 1, "Learning Curve Random Forest, Stemming, Stop Words"))
-print "Accuracy of Random Forest, Stemming w/o stop: %0.5f" % (test_forest(data, -1, 1, "Learning Curve Random Forest, Stemming, No Stop Words"))
-print "Accuracy of Random Forest, nltk Stemming w/stop: %0.5f" % (test_forest(data, 0, 1, "Learning Curve Random Forest, NLTK Stemming, Stop Words"))
-print "Accuracy of Random Forest, nltk Stemming w/o stop: %0.5f" % (test_forest(data, 2, 1, "Learning Curve Random Forest, NLTK Stemming, No Stop Words"))
 
-plt.show()
+# data = read_data(doc_name)
+
+
+def run_machine(file_name, title_mod):
+	data = read_data(file_name)
+	b1 = test_nb(data, 1, 1, "Learning Curve  Bayes, Stemming, Stop Words" + title_mod)
+	b2 = test_nb(data, -1, 1, "Learning Curve Bayes, Stemming, No Stop Words" + title_mod)
+	b3 = test_nb(data, 0, 1, "Learning Curve  Bayes, NLTK Stemming, Stop Words" + title_mod)
+	b4 = test_nb(data, 2, 1, "Learning Curve  Bayes, NLTK Stemming, No Stop Words" + title_mod)
+	s1 = test_svm(data, 1, 1, "Learning Curve SVM, Stemming, Stop Words" + title_mod)
+	s2 = test_svm(data, -1, 1, "Learning Curve SVM, Stemming, No Stop Words" + title_mod)
+	s3 = test_svm(data, 0, 1, "Learning Curve SVM, NLTK Stemming, Stop Words" + title_mod)
+	s4 = test_svm(data, 2, 1, "Learning Curve SVM, NLTK Stemming, No Stop Words" + title_mod)
+	f1 = test_forest(data, 1, 1, "Learning Curve Random Forest, Stemming, Stop Words" + title_mod)
+	f2 = test_forest(data, -1, 1, "Learning Curve Random Forest, Stemming, No Stop Words" + title_mod)
+	f3 = test_forest(data, 0, 1, "Learning Curve Random Forest, NLTK Stemming, Stop Words" + title_mod)
+	f4 = test_forest(data, 2, 1, "Learning Curve Random Forest, NLTK Stemming, No Stop Words" + title_mod)
+
+	A = []
+	A.append((b1, "Learning Curve Bayes, Stemming, Stop Words" + title_mod, "b1"))
+	A.append((b2, "Learning Curve Bayes, Stemming, No Stop Words" + title_mod, "b2"))
+	A.append((b3, "Learning Curve Bayes, NLTK Stemming, Stop Words" + title_mod, "b3"))
+	A.append((b4, "Learning Curve Bayes, NLTK Stemming, No Stop Words" + title_mod, "b4"))
+	A.append((s1, "Learning Curve SVM, Stemming, Stop Words" + title_mod, "s1"))
+	A.append((s2, "Learning Curve SVM, Stemming, No Stop Words" + title_mod, "s2"))
+	A.append((s3, "Learning Curve SVM, NLTK Stemming, Stop Words" + title_mod, "s3"))
+	A.append((s4, "Learning Curve SVM, NLTK Stemming, No Stop Words" + title_mod, "s4"))
+	A.append((f1, "Learning Curve Random Forest, Stemming, Stop Words" + title_mod, "f1"))
+	A.append((f2, "Learning Curve Random Forest, Stemming, No Stop Words" + title_mod, "f2"))
+	A.append((f3, "Learning Curve Random Forest, NLTK Stemming, Stop Words" + title_mod, "f3"))
+	A.append((f4, "Learning Curve Random Forest, NLTK Stemming, No Stop Words" + title_mod, "f4"))
+
+	print "Accuracy of Bayes - Stemming w/ stop %s: %0.5f" % (title_mod, b1)
+	print "Accuracy of Bayes - Stemming w/o stop %s: %0.5f" % (title_mod, b2)
+	print "Accuracy of Bayes - nltk Stemming w/stop %s: %0.5f" % (title_mod, b3)
+	print "Accuracy of Bayes - nltk Stemming w/o stop %s: %0.5f" % (title_mod, b4)
+	print "Accuracy of SVM - Stemming w/ stop %s: %0.5f" % (title_mod, s1)
+	print "Accuracy of SVM - Stemming w/o stop %s: %0.5f" % (title_mod, s2)
+	print "Accuracy of SVM - nltk Stemming w/stop %s: %0.5f" % (title_mod, s3)
+	print "Accuracy of SVM - nltk Stemming w/o stop %s: %0.5f" % (title_mod, s4)
+	print "Accuracy of Random Forest, Stemming w/ stop %s: %0.5f" % (title_mod, f1)
+	print "Accuracy of Random Forest, Stemming w/o stop %s: %0.5f" % (title_mod, f2)
+	print "Accuracy of Random Forest, nltk Stemming w/stop %s: %0.5f" % (title_mod, f3)
+	print "Accuracy of Random Forest, nltk Stemming w/o stop %s: %0.5f" % (title_mod, f4)
+
+	A = np.array(A)
+
+	plt.plot(A[:, 2], A[:, 0])
+	plt.xlabel('Method')
+	plt.ylabel('Accuracy')
+	plt.title('Final Accuracy')
+	plt.grid(True)
+	plt.savefig("plots/Final Accuracy"+title_mod+".png")
+
+	plt.show()
+
+
+# run_machine(data, ' - 2x Subreddits')
+# run_machine('2x_subreddit_test.json', ' - 2x Subreddits')
+# run_machine('3x_subreddit_test.json', ' - 3x Subreddits')
